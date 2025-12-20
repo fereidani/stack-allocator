@@ -28,9 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Clippy
-        run: rustup component add clippy
+        run: rustup +nightly component add clippy
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo +nightly clippy --all-targets --all-features -- -D warnings
   cargo_test:
     name: "Cargo Test"
     runs-on: ubuntu-latest
