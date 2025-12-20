@@ -1,0 +1,21 @@
+[package]
+name = "stack-allocator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Khashayar Fereidani"]
+description = "A stack-based memory allocator with optional fallback to a global/secondary allocator."
+license = "MIT"
+repository = "https://github.com/fereidani/stack-allocator"
+readme = "README.md"
+keywords = ["allocator", "stack", "alloc", "memory-management", "no-std"]
+categories = ["data-structures", "no-std"]
+
+[dependencies]
+allocator-api2 = "0"
+
+[build-dependencies]
+rustc_version = "0.4"
+
+[features]
+std = []
+alloc = []
