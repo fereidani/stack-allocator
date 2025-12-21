@@ -5,7 +5,22 @@ use stack_allocator::StackAllocator;
 use std::sync::Arc;
 
 const STACK_SIZE: usize = 8 * 1024;
+const BIG_STACK_SIZE: usize = 1024 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / std::mem::size_of::<usize>();
+
+#[test]
+#[cfg(not(nightly))]
+fn hash_brown_test() {
+    let alloc = StackAllocator::<BIG_STACK_SIZE>::new();
+    let mut map = hashbrown::HashMap::new_in(alloc);
+    for i in 0..MAX_USIZE {
+        map.insert(i, i);
+    }
+    assert_eq!(map.len(), MAX_USIZE);
+    for i in 0..MAX_USIZE {
+        assert_eq!(map.get(&i), Some(&i));
+    }
+}
 
 #[test]
 #[cfg(nightly)]

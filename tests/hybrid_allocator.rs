@@ -22,3 +22,21 @@ fn vec_hybrid_test() {
         assert_eq!(i, val);
     }
 }
+
+#[test]
+#[cfg(not(nightly))]
+fn hash_brown_test() {
+    use allocator_api2::alloc::Global;
+    let alloc: HybridAllocator<1024, Global> = HybridAllocator::<1024, _>::new(Global);
+    let mut map = hashbrown::HashMap::new_in(alloc);
+    for i in 0..MAX_USIZE {
+        map.insert(i, i);
+    }
+    assert_eq!(map.len(), MAX_USIZE);
+    for i in 0..MAX_USIZE {
+        assert_eq!(map.get(&i), Some(&i));
+    }
+    // move it to heap now
+    let mut heap_map = hashbrown::HashMap::with_capacity(map.capacity());
+    heap_map.extend(map.into_iter());
+}
