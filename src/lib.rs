@@ -69,11 +69,14 @@ impl<const N: usize> StackAllocator<N> {
 unsafe impl<const N: usize> Allocator for StackAllocator<N> {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         //println!("StackAllocator allocate: layout={:?}", layout);
+        let base = self.buf.get() as usize;
         let mut current = self.offset.load(Ordering::Acquire);
         let mut start;
         loop {
-            // Compute the start of the allocation respecting alignment.
-            start = Self::align_up(current, layout.align());
+            // Compute the aligned pointer address, then get the offset.
+            let current_ptr = base + current;
+            let aligned_ptr = Self::align_up(current_ptr, layout.align());
+            start = aligned_ptr - base;
             let end = start.checked_add(layout.size()).ok_or(AllocError)?;
 
             // Ensure we stay inside the buffer.
