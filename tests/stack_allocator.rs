@@ -5,7 +5,7 @@ use stack_allocator::StackAllocator;
 use std::sync::Arc;
 
 const STACK_SIZE: usize = 8 * 1024;
-const BIG_STACK_SIZE: usize = 1024 * 1024;
+const BIG_STACK_SIZE: usize = 256 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / std::mem::size_of::<usize>();
 
 #[test]
@@ -33,6 +33,26 @@ fn vec_test() {
     assert_eq!(v.len(), MAX_USIZE);
     for (i, &val) in v.iter().enumerate() {
         assert_eq!(i, val);
+    }
+}
+
+#[test]
+#[cfg(nightly)]
+fn two_vec_test() {
+    let alloc = Arc::new(StackAllocator::<STACK_SIZE>::new());
+    let mut v1 = Vec::with_capacity_in(MAX_USIZE / 2, alloc.clone());
+    let mut v2 = Vec::with_capacity_in(MAX_USIZE / 2, alloc.clone());
+    for i in 0..(MAX_USIZE / 2) {
+        v1.push(i);
+        v2.push(i + (MAX_USIZE / 2));
+    }
+    assert_eq!(v1.len(), MAX_USIZE / 2);
+    assert_eq!(v2.len(), MAX_USIZE / 2);
+    for (i, &val) in v1.iter().enumerate() {
+        assert_eq!(i, val);
+    }
+    for (i, &val) in v2.iter().enumerate() {
+        assert_eq!(i + (MAX_USIZE / 2), val);
     }
 }
 
