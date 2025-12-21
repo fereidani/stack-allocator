@@ -1,6 +1,6 @@
 [package]
 name = "stack-allocator"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Khashayar Fereidani"]
 description = "A stack-based memory allocator with optional fallback to a global/secondary allocator."
@@ -11,7 +11,9 @@ keywords = ["allocator", "stack", "alloc", "memory-management", "no-std"]
 categories = ["data-structures", "no-std"]
 
 [dependencies]
-allocator-api2 = "0"
+allocator-api2 = { version = "0.2.9", default-features = false, features = [
+    "alloc",
+] }
 
 [build-dependencies]
 rustc_version = "0.4"
@@ -19,3 +21,7 @@ rustc_version = "0.4"
 [features]
 std = []
 alloc = []
+
+[dev-dependencies]
+# intentional so when it breaks in CI we notice(allocator-api2 upgrade)
+hashbrown = "0"
