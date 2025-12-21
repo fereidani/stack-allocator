@@ -69,10 +69,11 @@ impl<const N: usize> StackAllocator<N> {
 unsafe impl<const N: usize> Allocator for StackAllocator<N> {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         //println!("StackAllocator allocate: layout={:?}", layout);
+        let mut current = self.offset.load(Ordering::Acquire);
         let mut start;
         loop {
             // Compute the start of the allocation respecting alignment.
-            start = Self::align_up(self.offset.load(Ordering::Acquire), layout.align());
+            start = Self::align_up(current, layout.align());
             let end = start.checked_add(layout.size()).ok_or(AllocError)?;
 
             // Ensure we stay inside the buffer.
@@ -83,11 +84,12 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             // Update the bump pointer.
             if self
                 .offset
-                .compare_exchange(start, end, Ordering::Release, Ordering::Relaxed)
+                .compare_exchange(current, end, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
             {
                 break;
             }
+            current = self.offset.load(Ordering::Acquire);
         }
         // SAFETY: `start..end` is inside `self.buf` and properly aligned.
         let ptr = unsafe { self.buf.get().cast::<u8>().add(start) };
