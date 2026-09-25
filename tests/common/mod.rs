@@ -2,17 +2,13 @@
 
 #![allow(dead_code)]
 
-#[cfg(feature = "nightly")]
-use std::alloc::{AllocError, Allocator, Global, Layout};
 use std::{
+    alloc::{AllocError, Allocator, Global, Layout},
     mem::MaybeUninit,
     ptr::NonNull,
     slice,
     sync::atomic::{AtomicUsize, Ordering::Relaxed},
 };
-
-#[cfg(not(feature = "nightly"))]
-use allocator_api2::alloc::{AllocError, Allocator, Global, Layout};
 
 /// Number of start offsets that `check_resize` runs from.
 pub const PREFIXES: usize = if cfg!(miri) { 9 } else { 64 };

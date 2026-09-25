@@ -1,22 +1,9 @@
 //! Tests for `HybridAllocator`.
 
-#![cfg_attr(feature = "nightly", feature(allocator_api))]
-
 mod common;
 
-#[cfg(feature = "nightly")]
-use std::{
-    alloc::{Allocator, Global},
-    boxed::Box,
-    vec::Vec,
-};
+use std::alloc::{Allocator, Global};
 
-#[cfg(not(feature = "nightly"))]
-use allocator_api2::{
-    alloc::{Allocator, Global},
-    boxed::Box,
-    vec::Vec,
-};
 use common::{addr, check_resize, layout, layouts, Tracking, PREFIXES};
 use stack_allocator::HybridAllocator;
 
@@ -51,7 +38,7 @@ fn vec_hybrid_test() {
 }
 
 #[test]
-#[cfg(not(feature = "nightly"))]
+#[cfg(feature = "allocator-api2")]
 fn hash_brown_test() {
     let alloc: HybridAllocator<1024, Global> = HybridAllocator::<1024, _>::new(Global);
     let mut map = hashbrown::HashMap::new_in(&alloc);
@@ -117,9 +104,25 @@ fn empty_blocks_use_no_memory() {
 }
 
 #[test]
+#[cfg(feature = "allocator-api2")]
 fn zero_sized_box_never_reaches_fallback() {
     let alloc = HybridAllocator::<0, Tracking>::new(Tracking::new());
-    drop(Box::new_in((), &alloc));
+    drop(allocator_api2::boxed::Box::new_in((), &alloc));
+    assert_eq!(alloc.fallback().counts(), (0, 0));
+}
+
+#[test]
+#[cfg(feature = "allocator-api2")]
+fn allocator_api2_collections() {
+    let alloc = HybridAllocator::<64, Tracking>::new(Tracking::new());
+    let mut v = allocator_api2::vec::Vec::new_in(&alloc);
+    for i in 0..100u64 {
+        v.push(i);
+    }
+    v.truncate(3);
+    v.shrink_to_fit();
+    assert_eq!(v.as_slice(), [0, 1, 2]);
+    drop(v);
     assert_eq!(alloc.fallback().counts(), (0, 0));
 }
 

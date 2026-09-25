@@ -1,15 +1,16 @@
 #![no_std]
-#![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc = include_str!("../README.md")]
 
-#[cfg(all(feature = "alloc", feature = "nightly"))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(all(feature = "alloc", feature = "nightly"))]
+#[cfg(feature = "allocator-api2")]
+mod api2;
+
+#[cfg(feature = "alloc")]
 use alloc::alloc::Global;
-#[cfg(feature = "nightly")]
-use core::alloc::{AllocError, Allocator, Layout};
 use core::{
+    alloc::{AllocError, Allocator, Layout},
     cell::UnsafeCell,
     mem::MaybeUninit,
     ptr::{self, NonNull},
@@ -19,10 +20,6 @@ use core::{
     },
 };
 
-#[cfg(all(feature = "alloc", not(feature = "nightly")))]
-use allocator_api2::alloc::Global;
-#[cfg(not(feature = "nightly"))]
-use allocator_api2::alloc::{AllocError, Allocator, Layout};
 // Debug assertions turn the `no-panic` check off, so mark the crate as used.
 #[cfg(all(feature = "no-panic", debug_assertions))]
 use no_panic as _;
@@ -39,14 +36,14 @@ const MAX_CAS_ATTEMPTS: usize = 1024;
 /// block can give memory back or grow in place; [`reset`] reclaims the rest.
 ///
 /// Only `&StackAllocator<N>` implements [`Allocator`], because moving the
-/// allocator would move its buffer.
+/// allocator would move its buffer. All references to the same allocator are
+/// equivalent allocators.
 ///
 /// [`reset`]: StackAllocator::reset
 ///
 /// # Examples
 ///
 /// ```
-/// use allocator_api2::vec::Vec;
 /// use stack_allocator::StackAllocator;
 ///
 /// let stack = StackAllocator::<64>::new();
@@ -58,7 +55,6 @@ const MAX_CAS_ATTEMPTS: usize = 1024;
 /// A collection cannot own the allocator:
 ///
 /// ```compile_fail,E0277
-/// use allocator_api2::vec::Vec;
 /// use stack_allocator::StackAllocator;
 ///
 /// let v: Vec<u8, StackAllocator<64>> = Vec::new_in(StackAllocator::new());
@@ -97,7 +93,6 @@ impl<const N: usize> StackAllocator<N> {
     /// Collections borrow the allocator, so this cannot run while they live:
     ///
     /// ```compile_fail,E0502
-    /// use allocator_api2::vec::Vec;
     /// use stack_allocator::StackAllocator;
     ///
     /// let mut stack = StackAllocator::<64>::new();
@@ -262,7 +257,8 @@ unsafe impl<const N: usize> Allocator for &StackAllocator<N> {
 /// # Examples
 ///
 /// ```
-/// use allocator_api2::{alloc::Global, vec::Vec};
+/// use std::alloc::Global;
+///
 /// use stack_allocator::HybridAllocator;
 ///
 /// let hybrid = HybridAllocator::<64, Global>::new(Global);

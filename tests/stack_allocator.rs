@@ -1,25 +1,19 @@
 //! Tests for `StackAllocator`.
 
-#![cfg_attr(feature = "nightly", feature(allocator_api))]
-
 mod common;
 
-#[cfg(feature = "nightly")]
-use std::{alloc::Allocator, boxed::Box, vec::Vec};
-use std::{ptr, thread};
+use std::{alloc::Allocator, ptr, thread};
 
-#[cfg(not(feature = "nightly"))]
-use allocator_api2::{alloc::Allocator, boxed::Box, vec::Vec};
 use common::{addr, check_resize, fill, holds, layout, layouts, PREFIXES};
 use stack_allocator::StackAllocator;
 
 const STACK_SIZE: usize = 8 * 1024;
-#[cfg(not(feature = "nightly"))]
+#[cfg(feature = "allocator-api2")]
 const BIG_STACK_SIZE: usize = 256 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / size_of::<usize>();
 
 #[test]
-#[cfg(not(feature = "nightly"))]
+#[cfg(feature = "allocator-api2")]
 fn hash_brown_test() {
     let alloc = StackAllocator::<BIG_STACK_SIZE>::new();
     let mut map = hashbrown::HashMap::new_in(&alloc);
@@ -30,6 +24,22 @@ fn hash_brown_test() {
     for i in 0..MAX_USIZE {
         assert_eq!(map.get(&i), Some(&i));
     }
+}
+
+#[test]
+#[cfg(feature = "allocator-api2")]
+fn allocator_api2_collections() {
+    let alloc = StackAllocator::<STACK_SIZE>::new();
+    let mut v = allocator_api2::vec::Vec::new_in(&alloc);
+    for i in 0..100u64 {
+        v.push(i);
+    }
+    v.truncate(3);
+    v.shrink_to_fit();
+    assert_eq!(v.as_slice(), [0, 1, 2]);
+    drop(v);
+    drop(allocator_api2::boxed::Box::new_in((), &alloc));
+    assert_eq!(alloc.current_offset(), 0);
 }
 
 #[test]

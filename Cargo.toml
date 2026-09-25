@@ -2,6 +2,8 @@
 name = "stack-allocator"
 version = "0.2.0"
 edition = "2021"
+# The first release with a stable `Allocator` trait.
+rust-version = "1.100"
 authors = ["Khashayar Fereidani"]
 description = "Fast no_std stack and bump allocator for Rust. Put Vec, Box, and HashMap in a fixed-size buffer with zero heap allocations, or fall back to the heap."
 license = "MIT"
@@ -16,7 +18,8 @@ categories = [
 ]
 
 [dependencies]
-allocator-api2 = { version = "0.2.9", default-features = false }
+# Keep in step with the version that `hashbrown` uses.
+allocator-api2 = { version = "0.2.9", default-features = false, optional = true }
 no-panic = { version = "0.1.37", optional = true }
 
 [dev-dependencies]
@@ -28,11 +31,11 @@ hashbrown = "0"
 
 [features]
 # `Default` for `HybridAllocator<N, Global>`.
-alloc = ["allocator-api2/alloc"]
-std = ["alloc", "allocator-api2/std"]
-# Use the unstable `core::alloc::Allocator`. Enabling `allocator-api2/nightly`
-# here would break `hashbrown`.
-nightly = []
+alloc = []
+std = ["alloc", "allocator-api2?/std"]
+# Also implement the `allocator-api2` trait, for crates such as `hashbrown`
+# that do not use the standard one yet.
+allocator-api2 = ["dep:allocator-api2"]
 # Link-time proof that the allocators cannot panic, in release builds only.
 no-panic = ["dep:no-panic"]
 
