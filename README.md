@@ -84,7 +84,7 @@ assert_eq!(v.len(), 2048);
 assert!(v.iter().copied().eq(0..2048));
 ```
 
-### HashMap on the stack with hashbrown
+### `HashMap` on the stack with hashbrown
 
 ```rust
 use hashbrown::HashMap;
@@ -97,7 +97,7 @@ scores.insert("bob", 7);
 assert_eq!(scores["alice"], 10);
 ```
 
-### Static allocator for no_std and embedded
+### Static allocator for `no_std` and embedded
 
 `StackAllocator::new` is a `const fn` and the allocator is `Sync`, so it can back a `static` without a global heap:
 
@@ -112,7 +112,7 @@ v.extend_from_slice(b"no heap");
 assert_eq!(v.as_slice(), b"no heap");
 ```
 
-### Nightly allocator_api with std::vec::Vec
+### Nightly `allocator_api` with `std::vec::Vec`
 
 ```toml
 [dependencies]
@@ -133,7 +133,7 @@ v.push(1);
 
 | Feature | Description |
 | --- | --- |
-| `nightly` | Implements the unstable `core::alloc::Allocator` for `std` collections such as `Vec::new_in`. Requires nightly, and `hashbrown` then needs its own `nightly` feature. |
+| `nightly` | Implements the unstable `core::alloc::Allocator` for `std` collections such as `Vec::new_in`. Requires nightly, and `hashbrown` then needs its own `nightly` feature. Enable it only in the final binary: it replaces the `allocator-api2` implementation, which breaks other crates in the build that use it. |
 | `alloc` | Implements `Default` for `HybridAllocator<N, Global>`. |
 | `std` | Enables `alloc` and the `std` support of `allocator-api2`. |
 | `no-panic` | Proves at link time that the allocators cannot panic, using [`no-panic`](https://crates.io/crates/no-panic). It only checks release builds, such as `cargo test --release --features no-panic`. |
@@ -144,7 +144,7 @@ The crate is `#![no_std]` and needs a global allocator only with the `alloc` fea
 
 ## How it works
 
-- `StackAllocator<N>` owns an `N`-byte buffer and an atomic offset. It pads each block to its alignment based on the real address, so any alignment works in any buffer.
+- `StackAllocator<N>` owns an `N`-byte buffer and an atomic offset. It pads each block to its alignment based on the real address, so alignments above the buffer's own alignment work as long as the padding fits.
 - `Allocator` is implemented for `&StackAllocator<N>` and `&HybridAllocator<N, F>`. Collections borrow the allocator, so the buffer cannot move or reset while they use it.
 - Freeing or shrinking the latest block returns its memory at once. Other freed memory comes back with `reset`, which takes `&mut self`, so it compiles only once every collection has dropped.
 - A block that cannot grow in place moves to a new block of the buffer. `HybridAllocator` moves it to the fallback allocator once the buffer is full.

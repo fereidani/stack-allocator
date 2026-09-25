@@ -7,15 +7,17 @@ mod common;
 #[cfg(feature = "nightly")]
 use std::{
     alloc::{Allocator, Global},
+    boxed::Box,
     vec::Vec,
 };
 
 #[cfg(not(feature = "nightly"))]
 use allocator_api2::{
     alloc::{Allocator, Global},
+    boxed::Box,
     vec::Vec,
 };
-use common::{check_resize, layout, layouts, Tracking, PREFIXES};
+use common::{addr, check_resize, layout, layouts, Tracking, PREFIXES};
 use stack_allocator::HybridAllocator;
 
 const STACK_SIZE: usize = 8 * 1024;
@@ -88,26 +90,44 @@ fn shrinking_older_stack_block_stays_in_stack() {
 }
 
 #[test]
-fn empty_block_on_full_stack_comes_from_fallback() {
+fn empty_blocks_use_no_memory() {
     let alloc = HybridAllocator::<16, Tracking>::new(Tracking::new());
     let hybrid = &alloc;
-    let full = hybrid.allocate(layout(16, 1)).unwrap();
-    let empty = hybrid.allocate(layout(0, 1)).unwrap();
-    assert_eq!(alloc.fallback().counts(), (1, 0));
-    // SAFETY: Both blocks are live and their layouts fit them.
+    let empty = hybrid.allocate(layout(0, 64)).unwrap();
+    assert_eq!((empty.len(), addr(empty) % 64), (0, 0));
+    assert_eq!(
+        (alloc.current_offset(), alloc.fallback().counts()),
+        (0, (0, 0))
+    );
+    // SAFETY: Each block is live and the old layout fits it.
     unsafe {
-        hybrid.deallocate(empty.cast(), layout(0, 1));
-        hybrid.deallocate(full.cast(), layout(16, 1));
+        let grown = hybrid
+            .grow(empty.cast(), layout(0, 64), layout(8, 1))
+            .unwrap();
+        assert_eq!(alloc.current_offset(), 8);
+        let shrunk = hybrid
+            .shrink(grown.cast(), layout(8, 1), layout(0, 1))
+            .unwrap();
+        hybrid.deallocate(shrunk.cast(), layout(0, 1));
     }
+    assert_eq!(
+        (alloc.current_offset(), alloc.fallback().counts()),
+        (0, (0, 0))
+    );
+}
+
+#[test]
+fn zero_sized_box_never_reaches_fallback() {
+    let alloc = HybridAllocator::<0, Tracking>::new(Tracking::new());
+    drop(Box::new_in((), &alloc));
     assert_eq!(alloc.fallback().counts(), (0, 0));
-    assert_eq!(alloc.current_offset(), 0);
 }
 
 #[test]
 fn zero_capacity_stack_uses_fallback_only() {
     let alloc = HybridAllocator::<0, Tracking>::new(Tracking::new());
     let hybrid = &alloc;
-    for size in [0, 1, 64] {
+    for size in [1, 64] {
         let block = hybrid.allocate(layout(size, 1)).unwrap();
         assert_eq!(alloc.fallback().counts(), (1, 0));
         // SAFETY: `block` is live and `layout(size, 1)` fits it.

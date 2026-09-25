@@ -326,11 +326,15 @@ impl<const N: usize, F: Allocator> HybridAllocator<N, F> {
     }
 }
 
-// SAFETY: The stack buffer cannot move while borrowed, and `owns` routes every
-// pointer back to the allocator that handed it out.
+// SAFETY: The stack buffer cannot move while borrowed. Empty blocks own no
+// memory and never reach either allocator, so `owns` only routes real blocks,
+// which cannot overlap.
 unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
     #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     fn allocate(&self, layout: Layout) -> AllocResult {
+        if layout.size() == 0 {
+            return dangling(layout);
+        }
         (&self.stack_alloc)
             .allocate(layout)
             .or_else(|_| self.fallback.allocate(layout))
@@ -338,6 +342,10 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
 
     #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        // allocator-api2's `Box` also frees empty blocks it never allocated.
+        if layout.size() == 0 {
+            return;
+        }
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`.
         unsafe {
@@ -351,6 +359,9 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
 
     #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn grow(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
+        if old.size() == 0 {
+            return self.allocate(new);
+        }
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`, and a
         // failed `grow` leaves the block untouched.
@@ -366,6 +377,11 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
 
     #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
+        if new.size() == 0 {
+            // SAFETY: The caller upholds the contract of `deallocate`.
+            unsafe { self.deallocate(ptr, old) };
+            return dangling(new);
+        }
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`, and a
         // failed `shrink` leaves the block untouched.
@@ -378,6 +394,12 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
                 .or_else(|_| stack.move_to(&self.fallback, ptr, old, new))
         }
     }
+}
+
+/// Returns an empty block for `layout` that owns no memory.
+fn dangling(layout: Layout) -> AllocResult {
+    let ptr = NonNull::new(ptr::without_provenance_mut(layout.align())).ok_or(AllocError)?;
+    Ok(NonNull::slice_from_raw_parts(ptr, 0))
 }
 
 /// Returns `true` if `ptr` is a multiple of `align`, a power of two.
