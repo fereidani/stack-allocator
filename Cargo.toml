@@ -1,13 +1,19 @@
 [package]
 name = "stack-allocator"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Khashayar Fereidani"]
-description = "A stack-based memory allocator with optional fallback to a global/secondary allocator."
+description = "Fast no_std stack and bump allocator for Rust. Put Vec, Box, and HashMap in a fixed-size buffer with zero heap allocations, or fall back to the heap."
 license = "MIT"
 repository = "https://github.com/fereidani/stack-allocator"
-keywords = ["allocator", "stack", "alloc", "memory-management", "no-std"]
-categories = ["data-structures", "no-std"]
+keywords = ["allocator", "stack", "arena", "bump", "no-std"]
+categories = [
+    "memory-management",
+    "no-std",
+    "no-std::no-alloc",
+    "embedded",
+    "data-structures",
+]
 
 [dependencies]
 allocator-api2 = { version = "0.2.9", default-features = false }
