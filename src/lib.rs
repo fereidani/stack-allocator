@@ -2,22 +2,25 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 #![cfg_attr(nightly, feature(allocator_api))]
-use core::cell::UnsafeCell;
-use core::mem::MaybeUninit;
-use core::ptr::NonNull;
-use core::sync::atomic::AtomicUsize;
-use core::sync::atomic::Ordering;
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    ptr::NonNull,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 extern crate alloc;
 
-#[cfg(not(nightly))]
-use allocator_api2::alloc::{AllocError, Allocator, Layout};
 #[cfg(nightly)]
 use core::alloc::{AllocError, Allocator, Layout};
 
+#[cfg(not(nightly))]
+use allocator_api2::alloc::{AllocError, Allocator, Layout};
+
 /// A simple bump‑allocator that lives on the stack (or in static memory).
 ///
-/// It will tries to reuse freed memory only if it is the most recently allocated block.
+/// It will tries to reuse freed memory only if it is the most recently
+/// allocated block.
 ///
 /// `N` is the size of the backing buffer in bytes.
 pub struct StackAllocator<const N: usize> {
@@ -109,7 +112,8 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
         let start = ptr.as_ptr() as usize - base;
         let end = start + layout.size();
 
-        // If this block is the most recent allocation, move the bump pointer back.
+        // If this block is the most recent allocation, move the bump pointer
+        // back.
         let _ = self
             .offset
             .compare_exchange(end, start, Ordering::Release, Ordering::Relaxed);
@@ -125,12 +129,14 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             "StackAllocator grow: old={:?}, new={:?}",
             old_layout, new_layout
         );*/
-        // `grow` is only allowed when the block being grown is the most recent allocation.
-        // Compute the start offset of the existing allocation.
+        // `grow` is only allowed when the block being grown is the most recent
+        // allocation. Compute the start offset of the existing
+        // allocation.
         let base = self.buf.get() as usize;
         let old_start = ptr.as_ptr() as usize - base;
 
-        // Verify that the allocator's current offset matches the end of this allocation.
+        // Verify that the allocator's current offset matches the end of this
+        // allocation.
         let expected_offset = old_start + old_layout.size();
         let current_offset = self.offset.load(Ordering::Acquire);
         if current_offset != expected_offset {
@@ -142,19 +148,22 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             return Err(AllocError);
         }
 
-        // Reject alignment increases -- the existing pointer may not satisfy them.
+        // Reject alignment increases -- the existing pointer may not satisfy
+        // them.
         if new_layout.align() > old_layout.align() {
             return Err(AllocError);
         }
 
-        // Compute the new end of the allocation, checking for overflow and buffer limits.
+        // Compute the new end of the allocation, checking for overflow and
+        // buffer limits.
         let new_end = old_start.checked_add(new_layout.size()).ok_or(AllocError)?;
         if new_end > N {
             return Err(AllocError);
         }
 
-        // Attempt to bump the allocator's offset forward. We don't retry on failure, since that
-        // would require copying the data to a new location.
+        // Attempt to bump the allocator's offset forward. We don't retry on
+        // failure, since that would require copying the data to a new
+        // location.
         if self
             .offset
             .compare_exchange(
@@ -165,8 +174,9 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             )
             .is_err()
         {
-            // Failed to grow in place (concurrent modification). Report failure so the
-            // caller can fall back to allocate + copy + deallocate.
+            // Failed to grow in place (concurrent modification). Report failure
+            // so the caller can fall back to allocate + copy +
+            // deallocate.
             return Err(AllocError);
         }
         // Return the same pointer, now representing a slice of the larger size.
@@ -183,7 +193,8 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
         let base = self.buf.get() as usize;
         let old_start = ptr.as_ptr() as usize - base;
 
-        // Verify that the allocator's current offset matches the end of this allocation.
+        // Verify that the allocator's current offset matches the end of this
+        // allocation.
         let expected_offset = old_start + old_layout.size();
         let current_offset = self.offset.load(Ordering::Acquire);
         if current_offset != expected_offset {
@@ -195,7 +206,8 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             return Err(AllocError);
         }
 
-        // Reject alignment increases -- the existing pointer may not satisfy them.
+        // Reject alignment increases -- the existing pointer may not satisfy
+        // them.
         if new_layout.align() > old_layout.align() {
             return Err(AllocError);
         }
@@ -206,7 +218,8 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
         // Attempt to move the bump pointer backwards.
         // We simply don't care if this fails, as it only means that some other
         // allocation happened in the meantime.
-        // In that case, the memory will be reclaimed later when `reset` is called.
+        // In that case, the memory will be reclaimed later when `reset` is
+        // called.
         _ = self.offset.compare_exchange(
             expected_offset,
             new_end,
@@ -214,7 +227,8 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             Ordering::Relaxed,
         );
 
-        // Return the same pointer, now representing a slice of the smaller size.
+        // Return the same pointer, now representing a slice of the smaller
+        // size.
         Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
     }
 }

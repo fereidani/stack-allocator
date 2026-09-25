@@ -1,8 +1,9 @@
 #![cfg_attr(nightly, feature(allocator_api))]
 #![allow(unused)]
 
-use stack_allocator::StackAllocator;
 use std::sync::Arc;
+
+use stack_allocator::StackAllocator;
 
 const STACK_SIZE: usize = 8 * 1024;
 const BIG_STACK_SIZE: usize = 256 * 1024;

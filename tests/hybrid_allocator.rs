@@ -1,8 +1,9 @@
 #![cfg_attr(nightly, feature(allocator_api))]
 #![allow(unused)]
 
-use stack_allocator::HybridAllocator;
 use std::sync::Arc;
+
+use stack_allocator::HybridAllocator;
 
 const STACK_SIZE: usize = 8 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / std::mem::size_of::<usize>();
