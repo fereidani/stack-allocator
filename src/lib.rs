@@ -1,5 +1,4 @@
 #![no_std]
-#![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc = include_str!("../README.md")]
 
