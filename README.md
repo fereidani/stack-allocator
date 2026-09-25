@@ -2,13 +2,15 @@
 
 [![Crates.io](https://img.shields.io/crates/v/stack-allocator.svg)](https://crates.io/crates/stack-allocator)
 [![Documentation](https://docs.rs/stack-allocator/badge.svg)](https://docs.rs/stack-allocator)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/fereidani/stack-allocator/blob/main/LICENSE)
 
 This crate provides two allocator types:
 
-- **`StackAllocator<N>`** - a bump‑allocator that uses a fixed‑size buffer stored on the stack (or in static memory). Allocations are fast and require no system calls. Individual blocks can be freed/shrinked/growed but only if they are the latest allocation.
+- **`StackAllocator<N>`** - a bump allocator that uses a fixed-size buffer stored on the stack (or in static memory). Allocations are fast and require no system calls. Only the latest block can give memory back or grow in place; other blocks move when they grow.
 
-- **`HybridAllocator<N, F>`** - a hybrid allocator that first tries to allocate from a `StackAllocator<N>` and, if the stack buffer is exhausted, falls back to a user‑provided allocator `F` (e.g. `std::alloc::Global`). This gives the performance benefits of stack allocation while still supporting unbounded allocations via the fallback.
+- **`HybridAllocator<N, F>`** - a hybrid allocator that first tries to allocate from a `StackAllocator<N>` and, if the stack buffer is exhausted, falls back to a user-provided allocator `F` (e.g. `Global`). This gives the performance benefits of stack allocation while still supporting unbounded allocations via the fallback.
+
+Both types implement `Allocator` for shared references (`&StackAllocator<N>`, `&HybridAllocator<N, F>`), so collections borrow the allocator and its buffer cannot move while they use it.
 
 ## Features
 
@@ -22,14 +24,13 @@ The crate is `#![no_std]` and needs a global allocator only with the `alloc` fea
 
 ## Usage
 
-```rust:ignore
-#![feature(allocator_api)]
-use stack_allocator::{StackAllocator, HybridAllocator};
-use std::alloc::Global;
+```rust
+use allocator_api2::{alloc::Global, vec::Vec};
+use stack_allocator::{HybridAllocator, StackAllocator};
 
-// A pure stack allocator with a 1 KiB buffer.
-let mut stack = StackAllocator::<1024>::new();
-let mut v = Vec::new_in(stack);
+// A pure stack allocator with a 1 KiB buffer.
+let stack = StackAllocator::<1024>::new();
+let mut v = Vec::new_in(&stack);
 for i in 0..10 {
     v.push(i);
 }
@@ -42,9 +43,9 @@ assert_eq!(v.len(), 0);
 v.shrink_to_fit();
 assert_eq!(v.capacity(), 0);
 
-// A hybrid allocator that falls back to the global allocator(heap).
+// A hybrid allocator that falls back to the global allocator (heap).
 let hybrid = HybridAllocator::<1024, Global>::new(Global);
-let mut v = Vec::new_in(hybrid);
+let mut v = Vec::new_in(&hybrid);
 for i in 0..2048 {
     v.push(i);
 }
