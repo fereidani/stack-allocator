@@ -17,46 +17,108 @@ jobs:
     name: "Cargo Format"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Install nightly toolchain
-        run: rustup toolchain install nightly --component rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt
       - name: Check formatting
         run: cargo +nightly fmt --all -- --check
   cargo_clippy:
     name: "Cargo Clippy"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Install Clippy
-        run: rustup +nightly component add clippy
-      - name: Run Clippy
+      - uses: actions/checkout@v7
+      - name: Install toolchains
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup toolchain install nightly --profile minimal --component clippy
+      - name: Run Clippy (stable)
+        run: cargo +stable clippy --all-targets --features std,no-panic -- -D warnings
+      - name: Run Clippy (nightly)
         run: cargo +nightly clippy --all-targets --all-features -- -D warnings
+      - name: Check documentation
+        run: cargo +stable doc --no-deps --features std
+        env:
+          RUSTDOCFLAGS: -D warnings
   cargo_test:
     name: "Cargo Test"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build
         run: cargo build --verbose
       - name: Test with Cargo
         run: cargo test --verbose
+      - name: Test with Cargo (alloc)
+        run: cargo test --verbose --features alloc
+      - name: Test with Cargo (std)
+        run: cargo test --verbose --features std
   cargo_test_release:
     name: "Cargo Test (Release)"
     runs-on: ubuntu-latest
     needs: [cargo_test]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build
-        run: cargo build --release --verbose
+        run: cargo build --release --verbose --features std
       - name: Test with Cargo (Release)
-        run: cargo test --release --verbose
+        run: cargo test --release --verbose --features std
   cargo_test_no_default_features:
     name: "Cargo Test (No Default Features)"
     runs-on: ubuntu-latest
     needs: [cargo_test_release]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build
         run: cargo build --no-default-features --verbose
       - name: Test with Cargo (No Default Features)
         run: cargo test --no-default-features --verbose
+  cargo_test_nightly:
+    name: "Cargo Test (Nightly)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly toolchain
+        run: rustup toolchain install nightly --profile minimal
+      # Doctests use allocator-api2 collections, so they only run on stable.
+      - name: Test with Cargo
+        run: cargo +nightly test --verbose --features nightly,std --lib --tests
+      - name: Test with Cargo (Release)
+        run: cargo +nightly test --release --verbose --features nightly,std --lib --tests
+  no_panic:
+    name: "No Panic (${{ matrix.toolchain }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolchain: stable
+            features: no-panic,std
+          - toolchain: nightly
+            features: no-panic,nightly,std
+    env:
+      # Also proves that no arithmetic overflows.
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install toolchain
+        run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
+      # Panics surface as link errors in the optimized test binaries. rustdoc
+      # does not optimize doctests, so they are skipped.
+      - name: Prove that the allocators cannot panic
+        run: cargo +${{ matrix.toolchain }} test --release --verbose --features "${{ matrix.features }}" --lib --tests
+  miri:
+    name: "Miri"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly toolchain
+        run: rustup toolchain install nightly --profile minimal --component miri,rust-src
+      - name: Set up Miri
+        run: cargo +nightly miri setup
+      - name: Test with Miri
+        run: cargo +nightly miri test --features std
+      - name: Test with Miri (Nightly)
+        run: cargo +nightly miri test --features nightly,std --lib --tests
+      # 32-bit targets have a smaller `usize` and a 4-byte aligned buffer.
+      - name: Test with Miri (32-bit)
+        run: cargo +nightly miri test --target i686-unknown-linux-gnu --features std
