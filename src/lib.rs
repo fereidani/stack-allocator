@@ -1,7 +1,15 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
-#![cfg_attr(nightly, feature(allocator_api))]
+#![cfg_attr(feature = "nightly", feature(allocator_api))]
+
+#[cfg(all(feature = "alloc", feature = "nightly"))]
+extern crate alloc;
+
+#[cfg(all(feature = "alloc", feature = "nightly"))]
+use alloc::alloc::Global;
+#[cfg(feature = "nightly")]
+use core::alloc::{AllocError, Allocator, Layout};
 use core::{
     cell::UnsafeCell,
     mem::MaybeUninit,
@@ -9,12 +17,9 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-extern crate alloc;
-
-#[cfg(nightly)]
-use core::alloc::{AllocError, Allocator, Layout};
-
-#[cfg(not(nightly))]
+#[cfg(all(feature = "alloc", not(feature = "nightly")))]
+use allocator_api2::alloc::Global;
+#[cfg(not(feature = "nightly"))]
 use allocator_api2::alloc::{AllocError, Allocator, Layout};
 
 /// A simple bump‑allocator that lives on the stack (or in static memory).
@@ -245,9 +250,9 @@ pub struct HybridAllocator<const N: usize, F: Allocator> {
 }
 
 #[cfg(feature = "alloc")]
-impl<const N: usize> Default for HybridAllocator<N, alloc::alloc::Global> {
+impl<const N: usize> Default for HybridAllocator<N, Global> {
     fn default() -> Self {
-        Self::new(alloc::alloc::Global)
+        Self::new(Global)
     }
 }
 

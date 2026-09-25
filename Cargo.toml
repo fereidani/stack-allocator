@@ -6,22 +6,24 @@ authors = ["Khashayar Fereidani"]
 description = "A stack-based memory allocator with optional fallback to a global/secondary allocator."
 license = "MIT"
 repository = "https://github.com/fereidani/stack-allocator"
-readme = "README.md"
 keywords = ["allocator", "stack", "alloc", "memory-management", "no-std"]
 categories = ["data-structures", "no-std"]
 
 [dependencies]
+allocator-api2 = { version = "0.2.9", default-features = false }
+
+[dev-dependencies]
 allocator-api2 = { version = "0.2.9", default-features = false, features = [
     "alloc",
 ] }
-
-[build-dependencies]
-rustc_version = "0.4"
-
-[features]
-std = []
-alloc = []
-
-[dev-dependencies]
 # intentional so when it breaks in CI we notice(allocator-api2 upgrade)
 hashbrown = "0"
+
+[features]
+# `Default` for `HybridAllocator<N, Global>`.
+alloc = ["allocator-api2/alloc"]
+std = ["alloc", "allocator-api2/std"]
+# Use the unstable `core::alloc::Allocator`. Enabling `allocator-api2/nightly`
+# here would break `hashbrown`.
+nightly = []
+

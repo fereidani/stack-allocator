@@ -1,4 +1,4 @@
-#![cfg_attr(nightly, feature(allocator_api))]
+#![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![allow(unused)]
 
 use std::sync::Arc;
@@ -9,7 +9,7 @@ const STACK_SIZE: usize = 8 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / std::mem::size_of::<usize>();
 
 #[test]
-#[cfg(nightly)]
+#[cfg(feature = "nightly")]
 fn vec_hybrid_test() {
     use std::alloc::Global;
     let hybrid_alloc: HybridAllocator<1024, Global> = HybridAllocator::<1024, _>::new(Global);
@@ -25,7 +25,7 @@ fn vec_hybrid_test() {
 }
 
 #[test]
-#[cfg(not(nightly))]
+#[cfg(not(feature = "nightly"))]
 fn hash_brown_test() {
     use allocator_api2::alloc::Global;
     let alloc: HybridAllocator<1024, Global> = HybridAllocator::<1024, _>::new(Global);

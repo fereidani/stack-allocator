@@ -12,9 +12,13 @@ This crate provides two allocator types:
 
 ## Features
 
-- **`allocator_api`** - uses the nightly `allocator_api` feature to implement `std::alloc::Allocator`.
-- **`allocator-api2`** – A stable fallback that mirrors the core allocation API, allowing this crate to be used on stable Rust with libraries like `hashbrown` that depend on `allocator-api2`.
-  **Note:** This crate is `#![no_std]` compatible.
+- **`nightly`** - implements the unstable `core::alloc::Allocator` for `std` collections such as `Vec::new_in`. Requires nightly, and `hashbrown` then needs its own `nightly` feature.
+- **`alloc`** - implements `Default` for `HybridAllocator<N, Global>`.
+- **`std`** - enables `alloc` and the `std` support of `allocator-api2`.
+
+By default the allocators implement the [`allocator-api2`](https://crates.io/crates/allocator-api2) trait, which works on stable Rust with `allocator_api2::vec::Vec`, `hashbrown`, and other crates built on it.
+
+The crate is `#![no_std]` and needs a global allocator only with the `alloc` feature.
 
 ## Usage
 
@@ -53,6 +57,3 @@ assert_eq!(v.len(), 0);
 v.shrink_to_fit();
 assert_eq!(v.capacity(), 0);
 ```
-
-The crate is `#![no_std]` compatible.
-It is usable in stable rust using `allocator-api2`.

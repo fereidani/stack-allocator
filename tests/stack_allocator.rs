@@ -1,4 +1,4 @@
-#![cfg_attr(nightly, feature(allocator_api))]
+#![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![allow(unused)]
 
 use std::sync::Arc;
@@ -10,7 +10,7 @@ const BIG_STACK_SIZE: usize = 256 * 1024;
 const MAX_USIZE: usize = STACK_SIZE / std::mem::size_of::<usize>();
 
 #[test]
-#[cfg(not(nightly))]
+#[cfg(not(feature = "nightly"))]
 fn hash_brown_test() {
     let alloc = StackAllocator::<BIG_STACK_SIZE>::new();
     let mut map = hashbrown::HashMap::new_in(alloc);
@@ -24,7 +24,7 @@ fn hash_brown_test() {
 }
 
 #[test]
-#[cfg(nightly)]
+#[cfg(feature = "nightly")]
 fn vec_test() {
     let alloc = StackAllocator::<STACK_SIZE>::new();
     let mut v = Vec::new_in(alloc);
@@ -38,7 +38,7 @@ fn vec_test() {
 }
 
 #[test]
-#[cfg(nightly)]
+#[cfg(feature = "nightly")]
 fn two_vec_test() {
     let alloc = Arc::new(StackAllocator::<STACK_SIZE>::new());
     let mut v1 = Vec::with_capacity_in(MAX_USIZE / 2, alloc.clone());
@@ -58,7 +58,7 @@ fn two_vec_test() {
 }
 
 #[test]
-#[cfg(nightly)]
+#[cfg(feature = "nightly")]
 fn vec_shrink_test() {
     let alloc = Arc::new(StackAllocator::<STACK_SIZE>::new());
     let mut v = Vec::with_capacity_in(MAX_USIZE, alloc.clone());
