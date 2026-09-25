@@ -18,16 +18,18 @@ Allocate `Vec`, `Box`, and `HashMap` from a fixed-size buffer on the stack or in
 
 </div>
 
-`stack-allocator` provides two memory allocators for the standard Rust `Allocator` API, stable since Rust 1.100:
+`stack-allocator` provides three memory allocators for the standard Rust `Allocator` API, stable since Rust 1.100:
 
 - **`StackAllocator<N>`** - a bump allocator (arena) over an `N`-byte buffer stored on the stack or in static memory. Allocations are fast and require no system calls. Only the latest block can give memory back or grow in place; other blocks move when they grow.
 - **`HybridAllocator<N, F>`** - a hybrid allocator that first tries to allocate from a `StackAllocator<N>` and, if the stack buffer is exhausted, falls back to a user-provided allocator `F` (e.g. `Global`). This gives the performance benefits of stack allocation while still supporting unbounded allocations via the fallback.
+- **`BumpAllocator<N, F>`** - a bump allocator (arena) on the heap. It carves blocks from `N`-byte sections that it takes from `F` (e.g. `Global`) and takes a new section when one runs out, so it never needs a stack buffer. `reset` and drop free all sections at once.
 
 ## Why stack-allocator?
 
 - **Zero heap allocations**: memory comes from an inline buffer, so hot paths make no `malloc` or system calls.
 - **Constant-time bump allocation**: an allocation pads to the requested alignment and bumps a pointer.
 - **Heap fallback on demand**: `HybridAllocator` spills to `Global`, or any other allocator, once the stack buffer is full.
+- **Heap arenas**: `BumpAllocator` bumps through sections on the heap, so many short-lived blocks cost one `malloc` per section and one `free` each at the end.
 - **Works with the standard library**: `Vec`, `Box`, and other `std` collections take the allocators on stable Rust, and `hashbrown` works through the `allocator-api2` feature.
 - **`no_std` and embedded ready**: no global allocator required, a `const fn` constructor for `static` buffers, and a lock-free, thread-safe bump pointer.
 - **Sound and verified**: the borrow checker keeps the buffer in place while collections use it, Miri checks the tests for undefined behavior, and `no-panic` proves that the allocators cannot panic.
@@ -99,6 +101,27 @@ scores.insert("bob", 7);
 assert_eq!(scores["alice"], 10);
 ```
 
+### Heap arena with sections
+
+```rust
+use std::alloc::Global;
+
+use stack_allocator::BumpAllocator;
+
+// Sections of 4 KiB, taken from the global allocator as needed.
+let mut arena = BumpAllocator::<4096, Global>::new(Global);
+{
+    let mut values = Vec::new_in(&arena);
+    for i in 0..1000u64 {
+        values.push(i);
+    }
+    assert!(arena.sections() > 1);
+}
+// Frees every block at once and keeps the newest section for reuse.
+arena.reset();
+assert_eq!(arena.sections(), 1);
+```
+
 ### Static allocator for `no_std` and embedded
 
 `StackAllocator::new` is a `const fn` and the allocator is `Sync`, so it can back a `static` without a global heap:
@@ -117,10 +140,10 @@ assert_eq!(v.as_slice(), b"no heap");
 
 | Feature | Description |
 | --- | --- |
-| `alloc` | Implements `Default` for `HybridAllocator<N, Global>`. |
+| `alloc` | Implements `Default` for `HybridAllocator<N, Global>` and `BumpAllocator<N, Global>`. |
 | `std` | Enables `alloc`, and the `std` support of `allocator-api2` when that feature is on. |
 | `allocator-api2` | Also implements the [`allocator-api2`](https://crates.io/crates/allocator-api2) trait, for `hashbrown` and other crates that do not use the standard one yet. |
-| `no-panic` | Proves at link time that the allocators cannot panic, using [`no-panic`](https://crates.io/crates/no-panic). It only checks release builds, such as `cargo test --release --features no-panic`. |
+| `no-panic` | Proves at link time that the allocators cannot panic, using [`no-panic`](https://crates.io/crates/no-panic). It only checks release builds, and needs one codegen unit to see across calls, such as `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test --release --features no-panic`. |
 
 No feature is enabled by default. The crate is `#![no_std]` and needs a global allocator only with the `alloc` feature.
 
@@ -130,6 +153,7 @@ No feature is enabled by default. The crate is `#![no_std]` and needs a global a
 - `Allocator` is implemented for `&StackAllocator<N>` and `&HybridAllocator<N, F>`. Collections borrow the allocator, so the buffer cannot move or reset while they use it.
 - Freeing or shrinking the latest block returns its memory at once. Other freed memory comes back with `reset`, which takes `&mut self`, so it compiles only once every collection has dropped.
 - A block that cannot grow in place moves to a new block of the buffer. `HybridAllocator` moves it to the fallback allocator once the buffer is full, and hands out empty blocks without touching either allocator.
+- `BumpAllocator` keeps its sections in a linked list inside the sections themselves, so it needs no collection of its own. It is not `Sync`; each thread uses its own arena.
 
 ## Testing
 

@@ -5,7 +5,7 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use allocator_api2::alloc::{AllocError, Allocator};
 
-use crate::{AllocResult, HybridAllocator, StackAllocator};
+use crate::{AllocResult, BumpAllocator, HybridAllocator, StackAllocator};
 
 /// Converts a result of the standard trait into one of `allocator-api2`.
 fn convert(result: AllocResult) -> Result<NonNull<[u8]>, AllocError> {
@@ -56,3 +56,4 @@ macro_rules! forward {
 
 forward!([const N: usize] &StackAllocator<N>);
 forward!([const N: usize, F: core::alloc::Allocator] &HybridAllocator<N, F>);
+forward!([const N: usize, F: core::alloc::Allocator] &BumpAllocator<N, F>);

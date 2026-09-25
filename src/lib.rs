@@ -6,6 +6,7 @@ extern crate alloc;
 
 #[cfg(feature = "allocator-api2")]
 mod api2;
+mod bump;
 
 #[cfg(feature = "alloc")]
 use alloc::alloc::Global;
@@ -23,6 +24,8 @@ use core::{
 // Debug assertions turn the `no-panic` check off, so mark the crate as used.
 #[cfg(all(feature = "no-panic", debug_assertions))]
 use no_panic as _;
+
+pub use crate::bump::BumpAllocator;
 
 /// The result of an allocation request.
 type AllocResult = Result<NonNull<[u8]>, AllocError>;
@@ -126,23 +129,13 @@ impl<const N: usize> StackAllocator<N> {
     /// Returns the `(start, end)` offsets of a block at `ptr` with the size of
     /// `layout`, if it starts and ends inside the buffer.
     fn span(&self, ptr: NonNull<u8>, layout: Layout) -> Option<(usize, usize)> {
-        let base = self.base().as_ptr().addr();
-        let start = ptr.as_ptr().addr().wrapping_sub(base);
-        let end = start.checked_add(layout.size())?;
-        (start < N && end <= N).then_some((start, end))
+        span(self.base(), N, ptr, layout.size())
     }
 
     /// Returns the `(start, end)` offsets of a new block for `layout` at the
     /// first aligned address at or after `offset`, if it fits.
     fn fit(&self, offset: usize, layout: Layout) -> Option<(usize, usize)> {
-        debug_assert!(offset <= N, "offset past the buffer");
-        // Pad based on the absolute address.
-        let addr = self.base().as_ptr().addr().wrapping_add(offset);
-        let padding = addr.wrapping_neg() & (layout.align() - 1);
-        let start = offset.checked_add(padding)?;
-        let end = start.checked_add(layout.size())?;
-        // Empty blocks also start inside the buffer, so `owns` recognizes them.
-        (start < N && end <= N).then_some((start, end))
+        fit(self.base(), N, offset, layout)
     }
 
     /// Sets the offset to `new` if it still equals `current`.
@@ -390,6 +383,27 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
                 .or_else(|_| stack.move_to(&self.fallback, ptr, old, new))
         }
     }
+}
+
+/// Returns the `(start, end)` offsets of a block at `ptr` with `size` bytes, if
+/// it starts and ends inside the `len` bytes at `base`.
+fn span(base: NonNull<u8>, len: usize, ptr: NonNull<u8>, size: usize) -> Option<(usize, usize)> {
+    let start = ptr.as_ptr().addr().wrapping_sub(base.as_ptr().addr());
+    let end = start.checked_add(size)?;
+    (start < len && end <= len).then_some((start, end))
+}
+
+/// Returns the `(start, end)` offsets of a new block for `layout` in the `len`
+/// bytes at `base`, at the first aligned address at or after `offset`.
+fn fit(base: NonNull<u8>, len: usize, offset: usize, layout: Layout) -> Option<(usize, usize)> {
+    debug_assert!(offset <= len, "offset past the buffer");
+    // Pad based on the absolute address.
+    let addr = base.as_ptr().addr().wrapping_add(offset);
+    let padding = addr.wrapping_neg() & (layout.align() - 1);
+    let start = offset.checked_add(padding)?;
+    let end = start.checked_add(layout.size())?;
+    // Empty blocks also start inside the buffer, so `owns` recognizes them.
+    (start < len && end <= len).then_some((start, end))
 }
 
 /// Returns an empty block for `layout` that owns no memory.

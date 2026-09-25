@@ -85,6 +85,8 @@ jobs:
     env:
       # Also proves that no arithmetic overflows.
       CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+      # One codegen unit, so calls into other units do not hide the proof.
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Install toolchain
