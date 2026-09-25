@@ -24,6 +24,9 @@ use core::{
 use allocator_api2::alloc::Global;
 #[cfg(not(feature = "nightly"))]
 use allocator_api2::alloc::{AllocError, Allocator, Layout};
+// Debug assertions turn the `no-panic` check off, so mark the crate as used.
+#[cfg(all(feature = "no-panic", debug_assertions))]
+use no_panic as _;
 
 /// The result of an allocation request.
 type AllocResult = Result<NonNull<[u8]>, AllocError>;
@@ -70,6 +73,7 @@ pub struct StackAllocator<const N: usize> {
 }
 
 impl<const N: usize> Default for StackAllocator<N> {
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     fn default() -> Self {
         Self::new()
     }
@@ -102,6 +106,7 @@ impl<const N: usize> StackAllocator<N> {
     /// stack.reset();
     /// drop(v);
     /// ```
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     pub fn reset(&mut self) {
         *self.offset.get_mut() = 0;
     }
@@ -109,6 +114,7 @@ impl<const N: usize> StackAllocator<N> {
     /// Returns the number of bytes in use, including padding and freed blocks
     /// that are not reclaimed yet.
     #[must_use]
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     pub fn current_offset(&self) -> usize {
         self.offset.load(Acquire)
     }
@@ -204,6 +210,7 @@ impl<const N: usize> StackAllocator<N> {
 // SAFETY: Blocks are disjoint parts of the buffer, and the buffer cannot move,
 // reset, or drop while a `&StackAllocator` exists.
 unsafe impl<const N: usize> Allocator for &StackAllocator<N> {
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     fn allocate(&self, layout: Layout) -> AllocResult {
         for _ in 0..MAX_CAS_ATTEMPTS {
             let current = self.offset.load(Relaxed);
@@ -218,6 +225,7 @@ unsafe impl<const N: usize> Allocator for &StackAllocator<N> {
         Err(AllocError)
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         // allocator-api2's `Box` frees empty blocks it never allocated.
         if layout.size() == 0 {
@@ -231,12 +239,14 @@ unsafe impl<const N: usize> Allocator for &StackAllocator<N> {
         }
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn grow(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         debug_assert!(new.size() >= old.size());
         // SAFETY: The caller upholds the contract of `grow`.
         unsafe { self.resize(ptr, old, new) }
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         debug_assert!(new.size() <= old.size());
         // SAFETY: The caller upholds the contract of `shrink`.
@@ -271,6 +281,7 @@ pub struct HybridAllocator<const N: usize, F: Allocator> {
 
 #[cfg(feature = "alloc")]
 impl<const N: usize> Default for HybridAllocator<N, Global> {
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     fn default() -> Self {
         Self::new(Global)
     }
@@ -288,12 +299,14 @@ impl<const N: usize, F: Allocator> HybridAllocator<N, F> {
     }
 
     /// Frees every stack block. Blocks of the fallback allocator stay.
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     pub fn reset(&mut self) {
         self.stack_alloc.reset();
     }
 
     /// Returns the [`StackAllocator::current_offset`] of the stack buffer.
     #[must_use]
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     pub fn current_offset(&self) -> usize {
         self.stack_alloc.current_offset()
     }
@@ -308,6 +321,7 @@ impl<const N: usize, F: Allocator> HybridAllocator<N, F> {
     ///
     /// A request larger than the free space goes to the fallback earlier.
     #[must_use]
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     pub fn is_stack_exhausted(&self) -> bool {
         self.current_offset() >= N
     }
@@ -316,12 +330,14 @@ impl<const N: usize, F: Allocator> HybridAllocator<N, F> {
 // SAFETY: The stack buffer cannot move while borrowed, and `owns` routes every
 // pointer back to the allocator that handed it out.
 unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     fn allocate(&self, layout: Layout) -> AllocResult {
         (&self.stack_alloc)
             .allocate(layout)
             .or_else(|_| self.fallback.allocate(layout))
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`.
@@ -334,6 +350,7 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
         }
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn grow(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`, and a
@@ -348,6 +365,7 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &HybridAllocator<N, F> {
         }
     }
 
+    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
     unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         let stack = &self.stack_alloc;
         // SAFETY: `owns` picks the allocator that handed out `ptr`, and a

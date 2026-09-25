@@ -11,6 +11,7 @@ categories = ["data-structures", "no-std"]
 
 [dependencies]
 allocator-api2 = { version = "0.2.9", default-features = false }
+no-panic = { version = "0.1.37", optional = true }
 
 [dev-dependencies]
 allocator-api2 = { version = "0.2.9", default-features = false, features = [
@@ -26,4 +27,6 @@ std = ["alloc", "allocator-api2/std"]
 # Use the unstable `core::alloc::Allocator`. Enabling `allocator-api2/nightly`
 # here would break `hashbrown`.
 nightly = []
+# Link-time proof that the allocators cannot panic, in release builds only.
+no-panic = ["dep:no-panic"]
 

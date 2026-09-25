@@ -17,6 +17,7 @@ Both types implement `Allocator` for shared references (`&StackAllocator<N>`, `&
 - **`nightly`** - implements the unstable `core::alloc::Allocator` for `std` collections such as `Vec::new_in`. Requires nightly, and `hashbrown` then needs its own `nightly` feature.
 - **`alloc`** - implements `Default` for `HybridAllocator<N, Global>`.
 - **`std`** - enables `alloc` and the `std` support of `allocator-api2`.
+- **`no-panic`** - proves at link time that the allocators cannot panic, using [`no-panic`](https://crates.io/crates/no-panic). It only checks release builds, such as `cargo test --release --features no-panic`.
 
 By default the allocators implement the [`allocator-api2`](https://crates.io/crates/allocator-api2) trait, which works on stable Rust with `allocator_api2::vec::Vec`, `hashbrown`, and other crates built on it.
 
