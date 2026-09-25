@@ -51,7 +51,7 @@ impl<const N: usize> StackAllocator<N> {
     /// the caller must guarantee that no live allocation
     /// created by this allocator is still in use.
     pub unsafe fn reset(&mut self) {
-        self.offset.store(0, Ordering::Release);
+        self.offset.store(0, Ordering::Relaxed);
     }
 
     /// Align `addr` upwards to `align`.  `align` must be a power of two.
@@ -142,6 +142,11 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             return Err(AllocError);
         }
 
+        // Reject alignment increases -- the existing pointer may not satisfy them.
+        if new_layout.align() > old_layout.align() {
+            return Err(AllocError);
+        }
+
         // Compute the new end of the allocation, checking for overflow and buffer limits.
         let new_end = old_start.checked_add(new_layout.size()).ok_or(AllocError)?;
         if new_end > N {
@@ -160,8 +165,9 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             )
             .is_err()
         {
-            // We failed to grow in place; allocate a new block and return that if possible.
-            return self.allocate(new_layout);
+            // Failed to grow in place (concurrent modification). Report failure so the
+            // caller can fall back to allocate + copy + deallocate.
+            return Err(AllocError);
         }
         // Return the same pointer, now representing a slice of the larger size.
         Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
@@ -189,6 +195,11 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
             return Err(AllocError);
         }
 
+        // Reject alignment increases -- the existing pointer may not satisfy them.
+        if new_layout.align() > old_layout.align() {
+            return Err(AllocError);
+        }
+
         // Compute the new end of the allocation.
         let new_end = old_start + new_layout.size();
 
@@ -205,12 +216,6 @@ unsafe impl<const N: usize> Allocator for StackAllocator<N> {
 
         // Return the same pointer, now representing a slice of the smaller size.
         Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
-    }
-    fn by_ref(&self) -> &Self
-    where
-        Self: Sized,
-    {
-        self
     }
 }
 
@@ -266,7 +271,7 @@ impl<const N: usize, F: Allocator> HybridAllocator<N, F> {
     /// Check if the last allocation used the fallback allocator.
     /// if true, the stack buffer is exhausted and all further allocations
     /// will go to the fallback until reset is called.
-    pub fn is_stack_exausted(&self) -> bool {
+    pub fn is_stack_exhausted(&self) -> bool {
         self.current_offset() >= N
     }
 }
@@ -308,10 +313,10 @@ unsafe impl<const N: usize, F: Allocator> Allocator for HybridAllocator<N, F> {
                 return Ok(res);
             } else {
                 // We need to alloc manually a new block and copy the data.
-                let mut new_ptr = self.fallback.allocate(new_layout)?;
+                let new_ptr = self.fallback.allocate(new_layout)?;
                 core::ptr::copy_nonoverlapping(
                     ptr.as_ptr(),
-                    new_ptr.as_mut() as *mut [u8] as *mut u8,
+                    new_ptr.as_ptr() as *mut u8,
                     old_layout.size(),
                 );
                 // Deallocate the old block.
@@ -341,12 +346,5 @@ unsafe impl<const N: usize, F: Allocator> Allocator for HybridAllocator<N, F> {
         }
         // Fallback allocator handles the shrink request.
         self.fallback.shrink(ptr, old_layout, new_layout)
-    }
-
-    fn by_ref(&self) -> &Self
-    where
-        Self: Sized,
-    {
-        self
     }
 }
