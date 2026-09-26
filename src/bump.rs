@@ -63,7 +63,7 @@ unsafe impl<const N: usize, F: Allocator + Send> Send for BumpAllocator<N, F> {}
 
 #[cfg(feature = "alloc")]
 impl<const N: usize> Default for BumpAllocator<N, Global> {
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     fn default() -> Self {
         Self::new(Global)
     }
@@ -83,7 +83,7 @@ impl<const N: usize, F: Allocator> BumpAllocator<N, F> {
 
     /// Frees every block at once. Keeps the newest section for reuse and
     /// returns the others to the heap allocator.
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     pub fn reset(&mut self) {
         let Some(current) = self.current.get() else {
             return;
@@ -222,7 +222,7 @@ impl<const N: usize, F: Allocator> BumpAllocator<N, F> {
 }
 
 impl<const N: usize, F: Allocator> Drop for BumpAllocator<N, F> {
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     fn drop(&mut self) {
         // SAFETY: Dropping takes ownership, so no block is used again.
         unsafe { self.free(self.current.get(), self.sections.get()) };
@@ -233,7 +233,7 @@ impl<const N: usize, F: Allocator> Drop for BumpAllocator<N, F> {
 // `reset` or drop. Both need `&mut self` or ownership, so no block outlives
 // the borrow of the allocator.
 unsafe impl<const N: usize, F: Allocator> Allocator for &BumpAllocator<N, F> {
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     fn allocate(&self, layout: Layout) -> AllocResult {
         if layout.size() == 0 {
             return dangling(layout);
@@ -245,7 +245,7 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &BumpAllocator<N, F> {
         self.bump(layout).ok_or(AllocError)
     }
 
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         // Only the latest block gives memory back; the rest waits for `reset`.
         if let Some(start) = self.latest_end(ptr, layout.size(), 0) {
@@ -253,14 +253,14 @@ unsafe impl<const N: usize, F: Allocator> Allocator for &BumpAllocator<N, F> {
         }
     }
 
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     unsafe fn grow(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         debug_assert!(new.size() >= old.size());
         // SAFETY: The caller upholds the contract of `grow`.
         unsafe { self.resize(ptr, old, new) }
     }
 
-    #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+    #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
     unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> AllocResult {
         debug_assert!(new.size() <= old.size());
         // SAFETY: The caller upholds the contract of `shrink`.

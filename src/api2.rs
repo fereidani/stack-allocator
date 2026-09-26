@@ -18,18 +18,18 @@ macro_rules! forward {
         // SAFETY: Every method forwards to the standard `Allocator`
         // implementation, which upholds the same contract.
         unsafe impl<$($generics)*> Allocator for $allocator {
-            #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+            #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
             fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
                 convert(core::alloc::Allocator::allocate(self, layout))
             }
 
-            #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+            #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
             unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
                 // SAFETY: The caller upholds the contract of `deallocate`.
                 unsafe { core::alloc::Allocator::deallocate(self, ptr, layout) }
             }
 
-            #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+            #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
             unsafe fn grow(
                 &self,
                 ptr: NonNull<u8>,
@@ -40,7 +40,7 @@ macro_rules! forward {
                 convert(unsafe { core::alloc::Allocator::grow(self, ptr, old, new) })
             }
 
-            #[cfg_attr(all(feature = "no-panic", not(debug_assertions)), no_panic::no_panic)]
+            #[cfg_attr(all(no_panic, not(debug_assertions)), no_panic::no_panic)]
             unsafe fn shrink(
                 &self,
                 ptr: NonNull<u8>,

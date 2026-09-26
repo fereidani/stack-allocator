@@ -82,7 +82,7 @@ pub fn check_resize(alloc: impl Allocator + Copy, prefix: usize, old: Layout, ne
 }
 
 /// A `Global` wrapper that records its blocks and counts foreign pointers.
-/// It never panics, so it works with the `no-panic` feature.
+/// It never panics, so it works with the `no-panic` check.
 pub struct Tracking {
     blocks: [AtomicUsize; 64],
     foreign: AtomicUsize,

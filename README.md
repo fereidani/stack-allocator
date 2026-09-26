@@ -143,7 +143,6 @@ assert_eq!(v.as_slice(), b"no heap");
 | `alloc` | Implements `Default` for `HybridAllocator<N, Global>` and `BumpAllocator<N, Global>`. |
 | `std` | Enables `alloc`, and the `std` support of `allocator-api2` when that feature is on. |
 | `allocator-api2` | Also implements the [`allocator-api2`](https://crates.io/crates/allocator-api2) trait, for `hashbrown` and other crates that do not use the standard one yet. |
-| `no-panic` | Proves at link time that the allocators cannot panic, using [`no-panic`](https://crates.io/crates/no-panic). It only checks release builds, and needs one codegen unit to see across calls, such as `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test --release --features no-panic`. |
 
 No feature is enabled by default. The crate is `#![no_std]` and needs a global allocator only with the `alloc` feature.
 
@@ -161,7 +160,13 @@ Every change runs through CI with:
 
 - the test suite with every feature;
 - [Miri](https://github.com/rust-lang/miri) on 64-bit and 32-bit targets, to catch undefined behavior;
-- `no-panic` on release builds with overflow checks, to prove that allocation, deallocation, grow, and shrink cannot panic;
+- [`no-panic`](https://crates.io/crates/no-panic) on release builds with overflow checks, to prove that allocation, deallocation, grow, and shrink cannot panic. It is a test-only check behind a cfg, not a feature, so it never touches your build. To run it locally:
+
+  ```sh
+  RUSTFLAGS="--cfg no_panic" CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true \
+    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test --release --features std,allocator-api2 --lib --tests
+  ```
+
 - exhaustive tests that resize blocks from every start offset below 64 bytes, for every alignment up to 256 bytes;
 - `clippy::pedantic` and `clippy::nursery` with warnings denied.
 

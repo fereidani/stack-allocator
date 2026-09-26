@@ -83,6 +83,9 @@ jobs:
     name: "No Panic"
     runs-on: ubuntu-latest
     env:
+      # Turns on `#[no_panic]`. It is a cfg and not a feature, so user builds
+      # never check it.
+      RUSTFLAGS: "--cfg no_panic"
       # Also proves that no arithmetic overflows.
       CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
       # One codegen unit, so calls into other units do not hide the proof.
@@ -94,7 +97,7 @@ jobs:
       # Panics surface as link errors in the optimized test binaries. rustdoc
       # does not optimize doctests, so they are skipped.
       - name: Prove that the allocators cannot panic
-        run: cargo +$RUST_TOOLCHAIN test --release --verbose --features no-panic,std,allocator-api2 --lib --tests
+        run: cargo +$RUST_TOOLCHAIN test --release --verbose --features std,allocator-api2 --lib --tests
   miri:
     name: "Miri"
     runs-on: ubuntu-latest
