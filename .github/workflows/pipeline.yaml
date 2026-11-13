@@ -11,9 +11,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # The `Allocator` trait is stable from Rust 1.100 on. Switch this to
-  # `stable` once 1.100 is released.
-  RUST_TOOLCHAIN: nightly
+  # The `Allocator` trait is stable from Rust 1.100 on.
+  RUST_TOOLCHAIN: stable
 
 jobs:
   cargo_fmt:
@@ -55,6 +54,18 @@ jobs:
         run: cargo +$RUST_TOOLCHAIN test --verbose --features std
       - name: Test with Cargo (allocator-api2)
         run: cargo +$RUST_TOOLCHAIN test --verbose --features allocator-api2
+  cargo_msrv:
+    name: "Cargo Test (MSRV)"
+    runs-on: ubuntu-latest
+    env:
+      # Keep in step with `rust-version` in Cargo.toml.
+      RUST_TOOLCHAIN: "1.100"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install toolchain
+        run: rustup toolchain install $RUST_TOOLCHAIN --profile minimal
+      - name: Test with Cargo (MSRV)
+        run: cargo +$RUST_TOOLCHAIN test --verbose --all-features
   cargo_test_release:
     name: "Cargo Test (Release)"
     runs-on: ubuntu-latest
